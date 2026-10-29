@@ -17,7 +17,6 @@ public enum Type {
     NORMAL,
     HERO,
     SPECIAL,
-    LEADER
 }
 public enum Row {
     TYL,
@@ -27,7 +26,7 @@ public enum Row {
 }
 public enum Abillities {
     ZWINNOSC,
-    BOTHATER,
+    BOHATER,
     MEDYK,
     MORAL,
     GRUPA,
@@ -43,4 +42,5 @@ public class Karta {
     Row row;
     Type type;
     Abillities abills;
+    int count;
 }
