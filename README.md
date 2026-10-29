@@ -1,2 +1,2 @@
 # Gwint
-Java implementation of the Witcher 3 minigame
+Java implementation of the Witcher minigame
