@@ -48,6 +48,7 @@ public class Gwint {
         }
         
         deck_show(Player1_Deck);
+        GraphicView.pokaz(Player1_Deck);
         
     }
     
