@@ -45,3 +45,4 @@ public class Karta {
     int count;
 }
 //ultra test
+//test galezi
