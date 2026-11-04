@@ -46,3 +46,4 @@ public class Karta {
 }
 //ultra test
 //test galezi
+//kolejny test pullowania
