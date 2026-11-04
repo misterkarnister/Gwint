@@ -4,37 +4,35 @@
  */
 package gwint;
 
-public enum Faction {
-    KROLESTWO_POLNOCY,
-    SCOIATEL,
-    POTWORY,
-    KROLENSTWO_NILFGARDU,
-    NEUTRAL
-    
-}
-
-public enum Type {
-    NORMAL,
-    HERO,
-    SPECIAL,
-}
-public enum Row {
-    TYL,
-    SRODEK,
-    PRZOD,
-    OTHER,
-}
-public enum Abillities {
-    ZWINNOSC,
-    BOHATER,
-    MEDYK,
-    MORAL,
-    GRUPA,
-    SZPIEG,
-    BRAT
-}
-
 public class Karta {
+    public enum Faction {
+        KROLESTWO_POLNOCY,
+        SCOIATEL,
+        POTWORY,
+        KROLENSTWO_NILFGARDU,
+        NEUTRAL
+    }
+
+    public enum Type {
+        NORMAL,
+        HERO,
+        SPECIAL,
+    }
+    public enum Row {
+        TYL,
+        SRODEK,
+        PRZOD,
+        OTHER,
+    }
+    public enum Abillities {
+        ZWINNOSC,
+        BOHATER,
+        MEDYK,
+        MORAL,
+        GRUPA,
+        SZPIEG,
+        BRAT
+    }
     int ID;
     String name;
     int power;
