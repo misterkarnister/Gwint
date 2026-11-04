@@ -44,3 +44,6 @@ public class Karta {
     Abillities abills;
     int count;
 }
+//ultra test
+//test galezi
+//kolejny test pullowania
