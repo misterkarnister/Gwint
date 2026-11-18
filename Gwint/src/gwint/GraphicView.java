@@ -71,8 +71,8 @@ public class GraphicView {
             g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
             g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
 
-            boolean hero = karta.type == Karta.Type.HERO;
-            boolean special = karta.type == Karta.Type.SPECIAL;
+            boolean hero = karta.getType() == Karta.Type.HERO;
+            boolean special = karta.getType() == Karta.Type.SPECIAL;
 
             // tlo karty
             g.setColor(new Color(45, 38, 32));
@@ -85,7 +85,7 @@ public class GraphicView {
 
             // nazwa na dole (bez paska, wiekszy font, cien dla czytelnosci)
             Font f = new Font("SansSerif", Font.BOLD, 26);
-            String nazwa = karta.name == null ? "?" : karta.name;
+            String nazwa = karta.getName() == null ? "?" : karta.getName();
             while (g.getFontMetrics(f).stringWidth(nazwa) > W - 16 && f.getSize() > 9) {
                 f = f.deriveFont((float) f.getSize() - 1);
             }
@@ -101,7 +101,7 @@ public class GraphicView {
                 g.setFont(new Font("SansSerif", Font.BOLD, 22));
                 // bohater: bialy numer na ciemnym kole, zwykla: czarny na jasnym
                 g.setColor(Color.BLACK);
-                srodek(g, String.valueOf(karta.power), 27, 28);
+                srodek(g, String.valueOf(karta.getPower()), 27, 28);
             }
 
             // ikona rzedu (melee/range/siege/special)
@@ -128,8 +128,8 @@ public class GraphicView {
         }
 
         private String ikonaRzedu() {
-            if (karta.row == null) return null;
-            switch (karta.row) {
+            if (karta.getRow() == null) return null;
+            switch (karta.getRow()) {
                 case PRZOD:   return "icon_melee.png";
                 case SRODEK:  return "icon_range.png";
                 case TYL:     return "icon_siege.png";
@@ -139,7 +139,8 @@ public class GraphicView {
         }
 
         private String literaUmiejetnosci() {
-            switch (karta.abills) {
+            if (karta.getAbills() == null) return "?";
+            switch (karta.getAbills()) {
                 case ZWINNOSC: return "Z";
                 case MEDYK:    return "M";
                 case MORAL:    return "MO";
@@ -152,7 +153,7 @@ public class GraphicView {
 
         // BOHATER nie liczy sie jako umiejetnosc - bohatera widac po kole z moca
         private boolean maUmiejetnosc() {
-            return karta.abills != null && karta.abills != Karta.Abillities.BOHATER;
+            return karta.getAbills() != null && karta.getAbills() != Karta.Abillities.BOHATER;
         }
 
         private void rysuj(Graphics2D g, String plik, int x, int y, int w, int h) {
