@@ -85,6 +85,8 @@ public class MatchTest {
         assertTrue(match.isFinished());
         assertEquals(3, match.round());
         assertTrue(match.result(), match.result().contains("draw"));
+        assertEquals(0, match.players()[0].getLives());
+        assertEquals(0, match.players()[1].getLives());
     }
 
     @Test
@@ -100,6 +102,21 @@ public class MatchTest {
         assertTrue(match.isFinished());
         assertTrue(match.result(), match.result().startsWith("Anna"));
         assertFalse(match.result().contains("draw"));
+        assertEquals(0, match.players()[0].getLives());
+        assertEquals(0, match.players()[1].getLives());
+    }
+
+    @Test
+    public void losingLifeDoesNotAffectOtherPlayer() {
+        Player winner = new Player("Winner", new ScriptedController("Winner",
+                Karta.Faction.POTWORY, Mode.PASS, 9));
+        Player loser = new Player("Loser", new ScriptedController("Loser",
+                Karta.Faction.SCOIATEL, Mode.PASS, 10));
+
+        loser.loseLife();
+
+        assertEquals(GameRules.START_LIVES, winner.getLives());
+        assertEquals(GameRules.START_LIVES - 1, loser.getLives());
     }
 
     @Test

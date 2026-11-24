@@ -9,6 +9,7 @@ public final class GameRules {
     public static final int MAX_SPECIAL_CARDS = 10;
     public static final int ROUNDS_TO_WIN = 2;
     public static final int MAX_ROUNDS = 3;
+    public static final int START_LIVES = 2;
 
     private GameRules() {
     }

@@ -21,6 +21,7 @@ public final class Player {
     private boolean leaderUsed;
     private boolean passed;
     private int roundWins;
+    private int lives = GameRules.START_LIVES;
 
     public Player(String name, PlayerController controller) {
         this.name = Objects.requireNonNull(name, "name");
@@ -134,6 +135,16 @@ public final class Player {
 
     public void addRoundWin() {
         roundWins++;
+    }
+
+    public int getLives() {
+        return lives;
+    }
+
+    public void loseLife() {
+        if (lives > 0) {
+            lives--;
+        }
     }
 
     /** Sum of the power of all cards currently on the player's board. */

@@ -1,3 +1,7 @@
 /Gwint/nbproject/private/
 /Gwint/build/
 /Gwint/dist/
+/out/
+*.class
+/.idea/
+*.iml
