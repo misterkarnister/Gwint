@@ -321,8 +321,10 @@ final class BoardView extends JFrame {
         playerScore.setScore(snapshot.player().score());
         opponentGems.setLives(snapshot.opponent().lives());
         playerGems.setLives(snapshot.player().lives());
-        opponentLeader.setLeader(snapshot.opponent().leaderName(), snapshot.opponent().faction());
-        playerLeader.setLeader(snapshot.player().leaderName(), snapshot.player().faction());
+        opponentLeader.setLeader(snapshot.opponent().leaderName(), snapshot.opponent().faction(),
+                snapshot.opponent().leaderDescription());
+        playerLeader.setLeader(snapshot.player().leaderName(), snapshot.player().faction(),
+                snapshot.player().leaderDescription());
         statusLabel.setText(snapshot.status().isEmpty() ? pendingStatus : snapshot.status());
 
         opponentHandPanel.removeAll();
@@ -747,16 +749,18 @@ final class BoardView extends JFrame {
     private static final class LeaderPanel extends JPanel {
 
         private String name = "";
+        private String description = "";
         private Karta.Faction faction;
 
         private LeaderPanel() {
-            setPreferredSize(new Dimension(70, 104));
+            setPreferredSize(new Dimension(210, 104));
             setOpaque(false);
         }
 
-        private void setLeader(String name, Karta.Faction faction) {
+        private void setLeader(String name, Karta.Faction faction, String description) {
             this.name = name == null ? "" : name;
             this.faction = faction;
+            this.description = description == null ? "" : description;
             repaint();
         }
 
@@ -766,20 +770,66 @@ final class BoardView extends JFrame {
             g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
             BufferedImage back = TextureLoader.get("card_back.png");
             if (back != null) {
-                g.drawImage(back, 0, 0, getWidth(), getHeight(), null);
+                g.drawImage(back, 4, 4, 64, 96, null);
+            } else {
+                g.setColor(UiTheme.PANEL);
+                g.fillRoundRect(4, 4, 64, 96, 8, 8);
+                g.setColor(GOLD);
+                g.drawRoundRect(4, 4, 64, 96, 8, 8);
             }
+            int x = 76;
+            int available = Math.max(40, getWidth() - x - 6);
+            String factionText = faction == null ? "Leader" : UiTheme.faction(faction);
+            g.setColor(GOLD);
+            g.setFont(new Font("SansSerif", Font.BOLD, 11));
+            g.drawString(trim(factionText, available, g), x, 20);
             g.setColor(Color.WHITE);
-            g.setFont(new Font("SansSerif", Font.BOLD, 10));
-            FontMetrics metrics = g.getFontMetrics();
-            String text = name.isEmpty() ? "Leader" : name;
-            while (metrics.stringWidth(text) > getWidth() - 8 && text.length() > 4) {
-                text = text.substring(0, text.length() - 2) + ".";
-            }
-            g.drawString(text, (getWidth() - metrics.stringWidth(text)) / 2, getHeight() - 8);
-            if (faction != null) {
-                g.drawString(faction.name(), 5, 14);
-            }
+            g.setFont(new Font("SansSerif", Font.BOLD, 14));
+            g.drawString(trim(name.isEmpty() ? "Leader" : name, available, g), x, 42);
+            g.setColor(UiTheme.MUTED);
+            g.setFont(new Font("SansSerif", Font.PLAIN, 11));
+            drawWrapped(g, description, x, 60, available, 14, 3);
             g.dispose();
+        }
+
+        private String trim(String text, int maxWidth, Graphics2D g) {
+            FontMetrics metrics = g.getFontMetrics();
+            if (metrics.stringWidth(text) <= maxWidth) {
+                return text;
+            }
+            String result = text;
+            while (!result.isEmpty() && metrics.stringWidth(result + ".") > maxWidth) {
+                result = result.substring(0, result.length() - 1);
+            }
+            return result + ".";
+        }
+
+        private void drawWrapped(Graphics2D g, String text, int x, int y,
+                                 int maxWidth, int lineHeight, int maxLines) {
+            if (text == null || text.isBlank()) {
+                return;
+            }
+            FontMetrics metrics = g.getFontMetrics();
+            StringBuilder line = new StringBuilder();
+            int drawn = 0;
+            for (String word : text.split("\\s+")) {
+                String candidate = line.isEmpty() ? word : line + " " + word;
+                if (metrics.stringWidth(candidate) > maxWidth && !line.isEmpty()) {
+                    g.drawString(line.toString(), x, y + drawn * lineHeight);
+                    drawn++;
+                    if (drawn >= maxLines) {
+                        return;
+                    }
+                    line.setLength(0);
+                    line.append(word);
+                } else {
+                    line.setLength(0);
+                    line.append(candidate);
+                }
+            }
+            if (drawn < maxLines && !line.isEmpty()) {
+                g.drawString(line.toString(), x, y + drawn * lineHeight);
+            }
         }
     }
 }

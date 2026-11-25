@@ -10,16 +10,25 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
-/** Loads the available leaders, with a built-in fallback if the file is absent. */
+/** Loads and validates the leaders defined in {@code assets/data/leaders.json}. */
 public final class LeaderCatalog {
 
     private static final String RESOURCE = "assets/data/leaders.json";
-    private static final String[] CWD_PATHS = {
-        "assets/data/leaders.json",
-        "Gwint/assets/data/leaders.json"
+    private static final String[] FILE_PATHS = {
+        "Gwint/assets/data/leaders.json",
+        "assets/data/leaders.json"
     };
+    private static final Set<Karta.Faction> PLAYABLE_FACTIONS = EnumSet.of(
+            Karta.Faction.KROLESTWO_POLNOCY,
+            Karta.Faction.SCOIATEL,
+            Karta.Faction.POTWORY,
+            Karta.Faction.KROLENSTWO_NILFGARDU
+    );
 
     private final List<Leader> leaders;
 
@@ -29,23 +38,47 @@ public final class LeaderCatalog {
 
     public static LeaderCatalog load() {
         String json = readJson();
-        if (json == null) {
-            return new LeaderCatalog(defaults());
-        }
         Leader[] parsed = new Gson().fromJson(json, Leader[].class);
         if (parsed == null || parsed.length == 0) {
-            return new LeaderCatalog(defaults());
+            throw new IllegalStateException("Leader catalog is empty: " + RESOURCE);
         }
         List<Leader> result = new ArrayList<>();
-        for (Leader leader : parsed) {
-            if (leader != null && leader.getName() != null && leader.getFaction() != null) {
-                result.add(leader);
+        Set<Integer> ids = new HashSet<>();
+        for (int i = 0; i < parsed.length; i++) {
+            Leader leader = parsed[i];
+            if (leader == null) {
+                throw new IllegalStateException("Null leader at index " + i + " in " + RESOURCE);
             }
+            if (leader.getName() == null || leader.getName().isBlank()) {
+                throw new IllegalStateException("Leader at index " + i + " has no name");
+            }
+            if (leader.getFaction() == null || !PLAYABLE_FACTIONS.contains(leader.getFaction())) {
+                throw new IllegalStateException("Leader " + leader.getName() + " has no playable faction");
+            }
+            if (leader.getDescription() == null || leader.getDescription().isBlank()) {
+                throw new IllegalStateException("Leader " + leader.getName() + " has no description");
+            }
+            if (leader.getId() <= 0) {
+                throw new IllegalStateException("Leader " + leader.getName() + " has invalid id " + leader.getId());
+            }
+            if (!ids.add(leader.getId())) {
+                throw new IllegalStateException("Duplicate leader id " + leader.getId());
+            }
+            result.add(leader);
         }
-        return result.isEmpty() ? new LeaderCatalog(defaults()) : new LeaderCatalog(result);
+        return new LeaderCatalog(result);
     }
 
     private static String readJson() {
+        for (String path : FILE_PATHS) {
+            if (Files.exists(Path.of(path))) {
+                try {
+                    return Files.readString(Path.of(path), StandardCharsets.UTF_8);
+                } catch (IOException e) {
+                    throw new IllegalStateException("Cannot read " + path, e);
+                }
+            }
+        }
         try (InputStream in = LeaderCatalog.class.getClassLoader().getResourceAsStream(RESOURCE)) {
             if (in != null) {
                 try (Reader reader = new InputStreamReader(in, StandardCharsets.UTF_8)) {
@@ -53,18 +86,9 @@ public final class LeaderCatalog {
                 }
             }
         } catch (IOException e) {
-            return null;
+            throw new IllegalStateException("Cannot read classpath resource " + RESOURCE, e);
         }
-        for (String path : CWD_PATHS) {
-            if (Files.exists(Path.of(path))) {
-                try {
-                    return Files.readString(Path.of(path), StandardCharsets.UTF_8);
-                } catch (IOException e) {
-                    return null;
-                }
-            }
-        }
-        return null;
+        throw new IllegalStateException("Cannot find " + RESOURCE + " on classpath or in working directory");
     }
 
     private static String readAll(Reader reader) throws IOException {
@@ -89,22 +113,5 @@ public final class LeaderCatalog {
             }
         }
         return result;
-    }
-
-    private static List<Leader> defaults() {
-        List<Leader> list = new ArrayList<>();
-        list.add(new Leader(1, "Vernon Roche", Karta.Faction.KROLESTWO_POLNOCY, "Seasoned commander", "NONE"));
-        list.add(new Leader(2, "John Natalis", Karta.Faction.KROLESTWO_POLNOCY, "Tactician", "NONE"));
-        list.add(new Leader(3, "Esterad Thyssen", Karta.Faction.KROLESTWO_POLNOCY, "Wealthy patron", "NONE"));
-        list.add(new Leader(4, "Emhyr var Emreis", Karta.Faction.KROLENSTWO_NILFGARDU, "Emperor", "NONE"));
-        list.add(new Leader(5, "Morvran Voorhis", Karta.Faction.KROLENSTWO_NILFGARDU, "Ambitious general", "NONE"));
-        list.add(new Leader(6, "Tibor Eggebracht", Karta.Faction.KROLENSTWO_NILFGARDU, "Proud noble", "NONE"));
-        list.add(new Leader(7, "Eithne", Karta.Faction.SCOIATEL, "Ancient sage", "NONE"));
-        list.add(new Leader(8, "Isengrim Faoiltiarna", Karta.Faction.SCOIATEL, "Guerrilla leader", "NONE"));
-        list.add(new Leader(9, "Iorveth", Karta.Faction.SCOIATEL, "Radical elf", "NONE"));
-        list.add(new Leader(10, "Dagon", Karta.Faction.POTWORY, "Primitive druid", "NONE"));
-        list.add(new Leader(11, "The Unseen Elder", Karta.Faction.POTWORY, "Vampire elder", "NONE"));
-        list.add(new Leader(12, "Kayran", Karta.Faction.POTWORY, "Ancient beast", "NONE"));
-        return list;
     }
 }

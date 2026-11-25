@@ -64,6 +64,8 @@ public class GameSnapshotTest {
         assertTrue(snapshot.round() >= 1 && snapshot.round() <= GameRules.MAX_ROUNDS);
         assertEquals("One", snapshot.player().name());
         assertEquals("Two", snapshot.opponent().name());
+        assertEquals("Seasoned commander", snapshot.player().leaderDescription());
+        assertEquals("Primitive druid of the swamps", snapshot.opponent().leaderDescription());
         assertTrue(snapshot.player().roundWins() >= 0);
         assertTrue(snapshot.opponent().roundWins() >= 0);
         assertEquals(match.players()[0].getLives(), snapshot.player().lives());

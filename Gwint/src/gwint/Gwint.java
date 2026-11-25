@@ -41,16 +41,13 @@ public final class Gwint {
         LeaderCatalog leaders = LeaderCatalog.load();
         Random random = new Random(seed);
 
-        ConsoleHumanController consoleHuman = new ConsoleHumanController(new Scanner(System.in), System.out);
-        RandomAiController randomAi = new RandomAiController(random);
-
         if (gui) {
-            runGui(catalog, leaders, consoleHuman, randomAi, random);
+            runGui(catalog, leaders, random);
             return;
         }
 
-        PlayerController human = consoleHuman;
-        PlayerController ai = randomAi;
+        PlayerController human = new ConsoleHumanController(new Scanner(System.in), System.out);
+        PlayerController ai = new RandomAiController(random);
         Match match = new Match(catalog, leaders, human, ai, random, System.out);
         match.play();
 
@@ -70,12 +67,14 @@ public final class Gwint {
         }
     }
 
-    private static void runGui(CardCatalog catalog, LeaderCatalog leaders,
-                               ConsoleHumanController consoleHuman, RandomAiController randomAi,
-                               Random random) {
+    private static void runGui(CardCatalog catalog, LeaderCatalog leaders, Random random) {
         BoardView view = createBoardView();
-        PlayerController human = new SwingPlayerController(consoleHuman, view);
-        PlayerController unitAi = new UnitFirstAiController(randomAi, random);
+        SetupWizard setup = new SetupWizard(catalog, leaders, random, () -> {
+            view.dispose();
+            System.exit(0);
+        });
+        PlayerController human = new SwingPlayerController(setup, view);
+        PlayerController unitAi = new UnitFirstAiController(new RandomAiController(random), random);
         PlayerController ai = new DelayedAiController(unitAi, view, 600);
         Match match = new Match(catalog, leaders, human, ai, random, System.out,
                 (current, event) -> view.refresh(current));

@@ -7,38 +7,38 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 final class SwingPlayerController implements PlayerController {
 
-    private final PlayerController delegate;
+    private final SetupWizard setup;
     private final BoardView view;
     private final BlockingQueue<Actions.Action> actions = new LinkedBlockingQueue<>(1);
 
-    SwingPlayerController(PlayerController delegate, BoardView view) {
-        this.delegate = Objects.requireNonNull(delegate, "delegate");
+    SwingPlayerController(SetupWizard setup, BoardView view) {
+        this.setup = Objects.requireNonNull(setup, "setup");
         this.view = Objects.requireNonNull(view, "view");
     }
 
     @Override
     public String name() {
-        return delegate.name();
+        return "You";
     }
 
     @Override
     public Karta.Faction chooseFaction(CardCatalog catalog) {
-        return delegate.chooseFaction(catalog);
+        return setup.chooseFaction();
     }
 
     @Override
     public DeckList buildDeck(CardCatalog catalog, Karta.Faction faction) {
-        return delegate.buildDeck(catalog, faction);
+        return setup.buildDeck(faction);
     }
 
     @Override
     public Leader chooseLeader(LeaderCatalog leaders, Karta.Faction faction) {
-        return delegate.chooseLeader(leaders, faction);
+        return setup.chooseLeader(faction);
     }
 
     @Override
     public List<CardInstance> chooseMulligan(List<CardInstance> hand) {
-        return delegate.chooseMulligan(hand);
+        return setup.chooseMulligan(hand);
     }
 
     @Override

@@ -71,13 +71,14 @@ final class GameSnapshot {
         private final int score;
         private final int deckCount;
         private final String leaderName;
+        private final String leaderDescription;
         private final Karta.Faction faction;
         private final List<CardRef> hand;
         private final List<CardRef> board;
         private final Map<Karta.Row, List<CardRef>> rows;
 
         private Side(String name, boolean active, boolean passed, int roundWins, int lives, int score,
-                     int deckCount, String leaderName, Karta.Faction faction,
+                     int deckCount, String leaderName, String leaderDescription, Karta.Faction faction,
                      List<CardRef> hand, List<CardRef> board,
                      Map<Karta.Row, List<CardRef>> rows) {
             this.name = name;
@@ -88,6 +89,7 @@ final class GameSnapshot {
             this.score = score;
             this.deckCount = deckCount;
             this.leaderName = leaderName;
+            this.leaderDescription = leaderDescription;
             this.faction = faction;
             this.hand = hand;
             this.board = board;
@@ -116,6 +118,7 @@ final class GameSnapshot {
             return new Side(player.getName(), active, player.isPassed(), player.getRoundWins(),
                     player.getLives(), player.score(), player.getDeck().size(),
                     leader == null ? "" : leader.getName(),
+                    leader == null ? "" : leader.getDescription(),
                     leader == null ? null : leader.getFaction(),
                     immutableList(player.getHand()), Collections.unmodifiableList(allBoard),
                     Collections.unmodifiableMap(immutableRows));
@@ -151,6 +154,10 @@ final class GameSnapshot {
 
         String leaderName() {
             return leaderName;
+        }
+
+        String leaderDescription() {
+            return leaderDescription;
         }
 
         Karta.Faction faction() {
