@@ -70,4 +70,11 @@
     nbproject/build-impl.xml file. 
 
     -->
+
+    <!-- Bundle the JSON data and card art into the classpath and the distribution jar. -->
+    <target name="-post-compile">
+        <copy todir="${build.classes.dir}/assets" overwrite="true">
+            <fileset dir="assets"/>
+        </copy>
+    </target>
 </project>

@@ -1,0 +1,17 @@
+[
+  {"id": 1, "name": "Vernon Roche", "faction": "KROLESTWO_POLNOCY", "description": "Seasoned commander", "abilityId": "NONE"},
+  {"id": 2, "name": "John Natalis", "faction": "KROLESTWO_POLNOCY", "description": "Careful tactician", "abilityId": "NONE"},
+  {"id": 3, "name": "Esterad Thyssen", "faction": "KROLESTWO_POLNOCY", "description": "Wealthy patron of the arts", "abilityId": "NONE"},
+
+  {"id": 4, "name": "Emhyr var Emreis", "faction": "KROLENSTWO_NILFGARDU", "description": "Emperor of Nilfgaard", "abilityId": "NONE"},
+  {"id": 5, "name": "Morvran Voorhis", "faction": "KROLENSTWO_NILFGARDU", "description": "Ambitious general", "abilityId": "NONE"},
+  {"id": 6, "name": "Tibor Eggebracht", "faction": "KROLENSTWO_NILFGARDU", "description": "Proud and ruthless noble", "abilityId": "NONE"},
+
+  {"id": 7, "name": "Eithne", "faction": "SCOIATEL", "description": "Ancient druid sage", "abilityId": "NONE"},
+  {"id": 8, "name": "Isengrim Faoiltiarna", "faction": "SCOIATEL", "description": "Guerrilla commander", "abilityId": "NONE"},
+  {"id": 9, "name": "Iorveth", "faction": "SCOIATEL", "description": "Radical elf leader", "abilityId": "NONE"},
+
+  {"id": 10, "name": "Dagon", "faction": "POTWORY", "description": "Primitive druid of the swamps", "abilityId": "NONE"},
+  {"id": 11, "name": "The Unseen Elder", "faction": "POTWORY", "description": "Immortal vampire elder", "abilityId": "NONE"},
+  {"id": 12, "name": "Kayran", "faction": "POTWORY", "description": "Ancient beast of the mountains", "abilityId": "NONE"}
+]
