@@ -1,5 +1,6 @@
 package gwint;
 
+import gwint.engine.InstanceIdSource;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -138,9 +139,14 @@ public final class DeckList {
 
     /** Expands the definition list into shuffled, uniquely identified cards. */
     public List<CardInstance> toInstances(Random random) {
+        return toInstances(random, InstanceIdSource.sequential());
+    }
+
+    /** Expands the definitions using a shared id source for the whole match. */
+    public List<CardInstance> toInstances(Random random, InstanceIdSource ids) {
         List<CardInstance> instances = new ArrayList<>();
         for (Karta k : cards) {
-            instances.add(new CardInstance(k));
+            instances.add(new CardInstance(k, ids));
         }
         Collections.shuffle(instances, random);
         return instances;

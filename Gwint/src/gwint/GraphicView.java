@@ -1,5 +1,6 @@
 package gwint;
 
+import gwint.engine.Ability;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -62,6 +63,24 @@ public class GraphicView {
             this.karta = karta;
             setPreferredSize(new Dimension(W, H));
             setOpaque(false);
+            setToolTipText(opis());
+        }
+
+        private String opis() {
+            StringBuilder sb = new StringBuilder("<html><b>").append(karta.getName())
+                    .append(karta.isHero() ? " [HERO]" : "")
+                    .append("</b><br>Power: ").append(karta.getPower())
+                    .append("<br>Row: ").append(karta.getRow())
+                    .append("<br>Abilities: ");
+            if (karta.abilities().isEmpty()) {
+                sb.append("none");
+            } else {
+                for (Ability ability : karta.abilities()) {
+                    sb.append(ability.displayName()).append(", ");
+                }
+                sb.setLength(sb.length() - 2);
+            }
+            return sb.append("</html>").toString();
         }
 
         @Override
@@ -113,9 +132,15 @@ public class GraphicView {
                 BufferedImage kolko = grafika("circle_special.png");
                 String plik = (kolko != null) ? "circle_special.png" : "icon_special.png";
                 rysuj(g, plik, 10, 96, 34, 34);
-                g.setFont(new Font("SansSerif", Font.BOLD, 16));
+                String skrot = skrotUmiejetnosci();
+                Font badgeFont = new Font("SansSerif", Font.BOLD, 16);
+                while (g.getFontMetrics(badgeFont).stringWidth(skrot) > 30
+                        && badgeFont.getSize() > 8) {
+                    badgeFont = badgeFont.deriveFont((float) badgeFont.getSize() - 1);
+                }
+                g.setFont(badgeFont);
                 g.setColor(Color.WHITE);
-                srodek(g, literaUmiejetnosci(), 27, 114);
+                srodek(g, skrot, 27, 114);
             }
 
             // dodatkowa zlota obwodka dla bohaterow
@@ -138,22 +163,42 @@ public class GraphicView {
             }
         }
 
-        private String literaUmiejetnosci() {
-            if (karta.getAbills() == null) return "?";
-            switch (karta.getAbills()) {
-                case ZWINNOSC: return "Z";
-                case MEDYK:    return "M";
-                case MORAL:    return "MO";
-                case GRUPA:    return "G";
-                case SZPIEG:   return "S";
-                case BRAT:     return "B";
-                default:       return "?";
+        private String skrotUmiejetnosci() {
+            StringBuilder sb = new StringBuilder();
+            for (Ability ability : karta.abilities()) {
+                if (ability == Ability.HERO) continue;
+                sb.append(switch (ability) {
+                    case AGILE -> "Z";
+                    case SPY -> "S";
+                    case MEDIC -> "M";
+                    case TIGHT_BOND -> "B";
+                    case MORALE_BOOST -> "MO";
+                    case COMMANDERS_HORN -> "CH";
+                    case MUSTER -> "G";
+                    case SCORCH_GLOBAL, SCORCH_MELEE, SCORCH_RANGED, SCORCH_SIEGE -> "SC";
+                    case DECOY -> "D";
+                    case BITING_FROST -> "F";
+                    case IMPENETRABLE_FOG -> "MG";
+                    case TORRENTIAL_RAIN -> "R";
+                    case SKELLIGE_STORM -> "ST";
+                    case CLEAR_WEATHER -> "C";
+                    case MARDROEME -> "MA";
+                    case BERSERKER -> "BE";
+                    case SUMMON_AVENGER -> "A";
+                    case HERO -> "";
+                });
             }
+            return sb.length() == 0 ? "?" : sb.toString();
         }
 
         // BOHATER nie liczy sie jako umiejetnosc - bohatera widac po kole z moca
         private boolean maUmiejetnosc() {
-            return karta.getAbills() != null && karta.getAbills() != Karta.Abillities.BOHATER;
+            for (Ability ability : karta.abilities()) {
+                if (ability != Ability.HERO) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         private void rysuj(Graphics2D g, String plik, int x, int y, int w, int h) {

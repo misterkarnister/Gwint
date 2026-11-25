@@ -8,11 +8,13 @@ import java.io.Reader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import gwint.engine.CardLibrary;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -22,7 +24,7 @@ import java.util.Set;
  * from the NetBeans build directory) and then relative to the working
  * directory (works when launched from the project root or its parent).
  */
-public final class CardCatalog {
+public final class CardCatalog implements CardLibrary {
 
     private static final String RESOURCE = "assets/data/karty.json";
     private static final String[] CWD_PATHS = {
@@ -39,14 +41,52 @@ public final class CardCatalog {
 
     private final List<Karta> cards;
     private final Map<Integer, Karta> byId;
+    private final Map<String, Karta> byKey;
 
     private CardCatalog(List<Karta> cards) {
         this.cards = Collections.unmodifiableList(new ArrayList<>(cards));
         Map<Integer, Karta> index = new LinkedHashMap<>();
+        Map<String, Karta> keys = new LinkedHashMap<>();
         for (Karta k : cards) {
             index.put(k.getId(), k);
+            keys.put(String.valueOf(k.getId()), k);
+            keys.put(normalizeName(k.getName()), k);
         }
         this.byId = Collections.unmodifiableMap(index);
+        this.byKey = Collections.unmodifiableMap(keys);
+        validateLinks();
+    }
+
+    private static String normalizeName(String name) {
+        StringBuilder sb = new StringBuilder();
+        boolean dash = false;
+        for (char ch : name.toLowerCase(Locale.ROOT).toCharArray()) {
+            if ((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9')) {
+                if (dash && sb.length() > 0) {
+                    sb.append('-');
+                }
+                sb.append(ch);
+                dash = false;
+            } else {
+                dash = true;
+            }
+        }
+        return sb.toString();
+    }
+
+    private void validateLinks() {
+        for (Karta k : cards) {
+            String transform = k.getTransformsTo();
+            if (transform != null && !transform.isBlank() && !byKey.containsKey(transform)) {
+                throw new IllegalStateException("Card " + k.getName()
+                        + " transforms into unknown card " + transform);
+            }
+            String avenger = k.getAvengerTokenId();
+            if (avenger != null && !avenger.isBlank() && !byKey.containsKey(avenger)) {
+                throw new IllegalStateException("Card " + k.getName()
+                        + " spawns unknown token " + avenger);
+            }
+        }
     }
 
     public static CardCatalog load() {
@@ -73,6 +113,7 @@ public final class CardCatalog {
             if (k.getFaction() == null || k.getType() == null) {
                 throw new IllegalStateException("Card " + k.getName() + " has no faction or type");
             }
+            k.normalize();
             list.add(k);
         }
         return new CardCatalog(list);
@@ -118,11 +159,21 @@ public final class CardCatalog {
         return byId.get(id);
     }
 
+    /** Resolves numeric ids and normalized names for transforms/tokens. */
+    @Override
+    public Karta card(String id) {
+        if (id == null) {
+            return null;
+        }
+        return byKey.get(id);
+    }
+
     /** Cards that a player who chose {@code faction} is allowed to put in the deck. */
     public List<Karta> allowedFor(Karta.Faction faction) {
         List<Karta> result = new ArrayList<>();
         for (Karta k : cards) {
-            if (k.getFaction() == faction || k.getFaction() == Karta.Faction.NEUTRAL) {
+            if (!k.isToken() && (k.getFaction() == faction
+                    || k.getFaction() == Karta.Faction.NEUTRAL)) {
                 result.add(k);
             }
         }

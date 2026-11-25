@@ -1,5 +1,9 @@
 package gwint;
 
+import gwint.engine.Ability;
+import gwint.engine.BattleRow;
+import gwint.engine.CardView;
+import gwint.engine.RowModifiers;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
@@ -134,7 +138,7 @@ public final class ConsoleHumanController implements PlayerController {
         if (hand.isEmpty()) {
             out.println("  (empty)");
         } else {
-            printNumbered(hand);
+            printNumbered(hand, match, self);
         }
         out.println("Commands: play <number>, pass, leader, help");
         while (true) {
@@ -177,6 +181,49 @@ public final class ConsoleHumanController implements PlayerController {
                 default -> out.println("Unknown command: " + parts[0]);
             }
         }
+    }
+
+    @Override
+    public BattleRow chooseRow(Match match, Player self, CardInstance card,
+                               List<BattleRow> options) {
+        out.println("\n" + card.card().getName() + " is Agile. Choose a row:");
+        return askRow(options, match, self);
+    }
+
+    @Override
+    public BattleRow chooseSpecialRow(Match match, Player self, CardInstance card,
+                                      List<BattleRow> options) {
+        out.println("\nChoose a row for " + card.card().getName() + ":");
+        return askRow(options, match, self);
+    }
+
+    @Override
+    public CardInstance chooseRevival(Match match, Player self, List<CardInstance> options) {
+        out.println("\nChoose a card to revive from your discard pile:");
+        printNumbered(options, match, self);
+        return options.get(readNumber("Card number: ", 1, options.size()) - 1);
+    }
+
+    @Override
+    public CardInstance chooseDecoyTarget(Match match, Player self, List<CardInstance> options) {
+        out.println("\nChoose one of your units to return to hand:");
+        printNumbered(options, match, self);
+        return options.get(readNumber("Card number: ", 1, options.size()) - 1);
+    }
+
+    private BattleRow askRow(List<BattleRow> options, Match match, Player self) {
+        for (int i = 0; i < options.size(); i++) {
+            BattleRow option = options.get(i);
+            String detail = match == null ? "" : activeEffects(match, self, option);
+            out.println("  " + (i + 1) + ". " + option
+                    + (detail.isEmpty() ? "" : "  [" + detail + "]"));
+        }
+        return options.get(readNumber("Row number: ", 1, options.size()) - 1);
+    }
+
+    private String activeEffects(Match match, Player self, BattleRow row) {
+        RowModifiers modifiers = match.engine().rowModifiers(self.side(), row);
+        return modifiers.hasEffects() ? modifiers.describe() : "";
     }
 
     private void addCard(CardCatalog catalog, DeckList deck, String[] parts) {
@@ -256,8 +303,10 @@ public final class ConsoleHumanController implements PlayerController {
                 continue;
             }
             out.println("  " + k.getId() + ". " + k.getName()
+                    + (k.isHero() ? " [HERO]" : "")
                     + " | power " + k.getPower() + " | " + k.getType()
-                    + " | " + k.getRow() + " | copies " + k.getCount());
+                    + " | " + k.getRow() + " | copies " + k.getCount()
+                    + " | Abilities: " + abilityList(k));
         }
     }
 
@@ -266,16 +315,50 @@ public final class ConsoleHumanController implements PlayerController {
                 + deck.nonSpecialCount() + " non-special, "
                 + deck.specialCount() + " special, total power " + deck.totalPower() + ")");
         for (Karta k : deck.cards()) {
-            out.println("  " + k.getName());
+            out.println("  " + k.getName() + (k.isHero() ? " [HERO]" : "")
+                    + " | " + k.getRow() + " | Abilities: " + abilityList(k));
         }
     }
 
     private void printNumbered(List<CardInstance> cards) {
+        printNumbered(cards, null, null);
+    }
+
+    private void printNumbered(List<CardInstance> cards, Match match, Player self) {
         for (int i = 0; i < cards.size(); i++) {
             CardInstance ci = cards.get(i);
-            out.println("  " + (i + 1) + ". " + ci.card().getName()
-                    + " - power " + ci.card().getPower() + ", " + ci.card().getRow());
+            CardView def = ci.definition();
+            int strength = match == null
+                    ? ci.card().getPower() : match.engine().breakdown(ci).finalStrength();
+            StringBuilder sb = new StringBuilder("  " + (i + 1) + ". " + def.name());
+            if (def.isHero()) {
+                sb.append(" [HERO]");
+            }
+            sb.append(" - strength ").append(strength).append(", ").append(ci.card().getRow());
+            if (match != null && ci.row() != null && self != null
+                    && self.side().findUnit(ci.uid()) != null) {
+                String effects = activeEffects(match, self, ci.row());
+                if (!effects.isEmpty()) {
+                    sb.append("  [").append(effects).append(']');
+                }
+            }
+            sb.append(" | Abilities: ").append(abilityList(def));
+            out.println(sb);
         }
+    }
+
+    private String abilityList(CardView card) {
+        if (card.abilities().isEmpty()) {
+            return "none";
+        }
+        StringBuilder sb = new StringBuilder();
+        for (Ability ability : card.abilities()) {
+            if (sb.length() > 0) {
+                sb.append(", ");
+            }
+            sb.append(ability.displayName());
+        }
+        return sb.toString();
     }
 
     private void printHelp() {
