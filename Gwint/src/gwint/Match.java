@@ -37,6 +37,7 @@ public final class Match {
     private final Random random;
     private final PrintStream out;
     private final Player[] players;
+    private final MatchListener listener;
     private final InstanceIdSource ids;
     private final GameState state;
     private final GameEngine engine;
@@ -49,10 +50,17 @@ public final class Match {
     public Match(CardCatalog catalog, LeaderCatalog leaders,
                  PlayerController playerOne, PlayerController playerTwo,
                  Random random, PrintStream out) {
+        this(catalog, leaders, playerOne, playerTwo, random, out, null);
+    }
+
+    public Match(CardCatalog catalog, LeaderCatalog leaders,
+                 PlayerController playerOne, PlayerController playerTwo,
+                 Random random, PrintStream out, MatchListener listener) {
         this.catalog = Objects.requireNonNull(catalog, "catalog");
         this.leaders = Objects.requireNonNull(leaders, "leaders");
         this.random = Objects.requireNonNull(random, "random");
         this.out = Objects.requireNonNull(out, "out");
+        this.listener = listener;
         this.ids = new SequentialIds();
         this.players = new Player[]{
             new Player(playerOne.name(), playerOne, ids),
@@ -130,6 +138,7 @@ public final class Match {
             }
             Actions.Action action = turn.getController().chooseAction(this, turn);
             boolean consumesTurn = apply(action, turn);
+            notifyEvent(MatchListener.Event.ACTION);
             if (finished) {
                 return;
             }
@@ -283,6 +292,7 @@ public final class Match {
         for (Player p : players) {
             p.setPassed(false);
         }
+        notifyEvent(MatchListener.Event.ROUND_END);
 
         if (players[0].getRoundWins() >= GameRules.ROUNDS_TO_WIN
                 || players[1].getRoundWins() >= GameRules.ROUNDS_TO_WIN) {
@@ -330,6 +340,13 @@ public final class Match {
         finished = true;
         result = message;
         out.println("=== " + message + " ===");
+        notifyEvent(MatchListener.Event.MATCH_END);
+    }
+
+    private void notifyEvent(MatchListener.Event event) {
+        if (listener != null) {
+            listener.onStateChanged(this, event);
+        }
     }
 
     private void render() {

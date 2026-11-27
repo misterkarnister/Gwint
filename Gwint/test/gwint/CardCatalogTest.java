@@ -12,8 +12,8 @@ public class CardCatalogTest {
     @Test
     public void loadsAndIndexesAllCards() {
         CardCatalog catalog = CardCatalog.load();
-        assertEquals(135, catalog.all().size());
-        assertEquals(8, catalog.specials().size());
+        assertEquals(146, catalog.all().size());
+        assertEquals(9, catalog.specials().size());
 
         Karta geralt = catalog.byId(1);
         assertNotNull(geralt);

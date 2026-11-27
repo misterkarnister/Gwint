@@ -1,5 +1,6 @@
 package gwint;
 
+import gwint.engine.Ability;
 import java.awt.AlphaComposite;
 import java.awt.BasicStroke;
 import java.awt.BorderLayout;
@@ -21,11 +22,13 @@ import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.awt.image.BufferedImage;
+import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import javax.swing.AbstractAction;
 import javax.swing.ActionMap;
@@ -37,6 +40,7 @@ import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.KeyStroke;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
@@ -115,7 +119,9 @@ final class BoardView extends JFrame {
         opponentHandLabel.setForeground(Color.WHITE);
         opponentHandPanel.setOpaque(false);
         opponentLeft.add(opponentHandLabel);
-        opponentLeft.add(opponentHandPanel);
+        opponentLeft.add(scrollPane(opponentHandPanel,
+                JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED,
+                JScrollPane.VERTICAL_SCROLLBAR_NEVER));
         top.add(opponentLeft, BorderLayout.WEST);
 
         JPanel topCenter = new JPanel(new BorderLayout(2, 2));
@@ -139,7 +145,9 @@ final class BoardView extends JFrame {
         bottom.setOpaque(false);
         bottom.setBorder(BorderFactory.createEmptyBorder(2, 10, 6, 10));
         playerHandPanel.setOpaque(false);
-        bottom.add(playerHandPanel, BorderLayout.CENTER);
+        bottom.add(scrollPane(playerHandPanel,
+                JScrollPane.HORIZONTAL_SCROLLBAR_NEVER,
+                JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED), BorderLayout.CENTER);
         JPanel bottomRight = sidePanel(playerScore, playerLeader, playerGems, true);
         passButton.setFont(new Font("SansSerif", Font.BOLD, 17));
         passButton.setEnabled(false);
@@ -170,12 +178,13 @@ final class BoardView extends JFrame {
         });
         bindKeys();
         content.add(top, BorderLayout.NORTH);
-        content.add(board, BorderLayout.CENTER);
+        content.add(scrollPane(board,
+                JScrollPane.HORIZONTAL_SCROLLBAR_NEVER,
+                JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED), BorderLayout.CENTER);
         content.add(bottom, BorderLayout.SOUTH);
         setContentPane(content);
-        setSize(1440, 900);
-        setMinimumSize(new Dimension(980, 700));
-        setLocationRelativeTo(null);
+        UiTheme.fitToScreen(this, new Dimension(1440, 900));
+        setMinimumSize(new Dimension(640, 480));
     }
 
     private JPanel sidePanel(ScoreBadgePanel score, LeaderPanel leader, GemPanel gems,
@@ -249,6 +258,14 @@ final class BoardView extends JFrame {
         return Math.max(min, Math.min(max, value));
     }
 
+    private static JScrollPane scrollPane(JComponent view, int horizontal, int vertical) {
+        JScrollPane pane = new JScrollPane(view, vertical, horizontal);
+        pane.setBorder(null);
+        pane.setOpaque(false);
+        pane.getViewport().setOpaque(false);
+        return pane;
+    }
+
     void open() {
         SwingUtilities.invokeLater(() -> {
             setVisible(true);
@@ -274,6 +291,7 @@ final class BoardView extends JFrame {
                 selectedHandIndex = -1;
                 hoveredHandIndex = -1;
                 rowChoice = false;
+                placement.clear();
                 pendingStatus = snapshot.status();
                 content.requestFocusInWindow();
                 render(snapshot);
@@ -284,6 +302,22 @@ final class BoardView extends JFrame {
         } catch (java.lang.reflect.InvocationTargetException e) {
             throw new IllegalStateException("Failed to start the human turn", e);
         }
+    }
+
+    Karta.Row consumePlacement(int uid) {
+        if (SwingUtilities.isEventDispatchThread()) {
+            return placement.remove(uid);
+        }
+        AtomicReference<Karta.Row> result = new AtomicReference<>();
+        try {
+            SwingUtilities.invokeAndWait(() -> result.set(placement.remove(uid)));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted while consuming placement", e);
+        } catch (InvocationTargetException e) {
+            throw new IllegalStateException("Failed to consume placement", e);
+        }
+        return result.get();
     }
 
     void setStatus(String text) {
@@ -528,7 +562,7 @@ final class BoardView extends JFrame {
     }
 
     private boolean isAgile(GameSnapshot.CardRef ref) {
-        return ref.card().getAbills() == Karta.Abillities.ZWINNOSC;
+        return ref.card().abilities().contains(Ability.AGILE);
     }
 
     private void submitAction(Actions.Action action) {

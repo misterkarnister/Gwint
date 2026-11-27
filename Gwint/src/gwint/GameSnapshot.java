@@ -31,8 +31,10 @@ final class GameSnapshot {
 
     static GameSnapshot of(Match match, String status) {
         Player[] players = match.players();
-        Side player = Side.of(players[0], match.currentPlayer() == players[0]);
-        Side opponent = Side.of(players[1], match.currentPlayer() == players[1]);
+        int playerLives = Math.max(0, GameRules.ROUNDS_TO_WIN - players[1].getRoundWins());
+        int opponentLives = Math.max(0, GameRules.ROUNDS_TO_WIN - players[0].getRoundWins());
+        Side player = Side.of(players[0], match.currentPlayer() == players[0], playerLives);
+        Side opponent = Side.of(players[1], match.currentPlayer() == players[1], opponentLives);
         return new GameSnapshot(match.round(), status == null ? "" : status,
                 match.isFinished(), match.result(), player, opponent);
     }
@@ -96,7 +98,7 @@ final class GameSnapshot {
             this.rows = rows;
         }
 
-        static Side of(Player player, boolean active) {
+        static Side of(Player player, boolean active, int lives) {
             Map<Karta.Row, List<CardRef>> rows = new EnumMap<>(Karta.Row.class);
             for (Karta.Row row : Karta.Row.values()) {
                 rows.put(row, new ArrayList<>());
@@ -116,7 +118,7 @@ final class GameSnapshot {
             }
             Leader leader = player.getLeader();
             return new Side(player.getName(), active, player.isPassed(), player.getRoundWins(),
-                    player.getLives(), player.score(), player.getDeck().size(),
+                    lives, player.score(), player.getDeck().size(),
                     leader == null ? "" : leader.getName(),
                     leader == null ? "" : leader.getDescription(),
                     leader == null ? null : leader.getFaction(),

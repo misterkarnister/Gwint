@@ -1,5 +1,6 @@
 package gwint;
 
+import gwint.engine.Ability;
 import java.awt.BasicStroke;
 import java.awt.Color;
 import java.awt.Font;
@@ -124,17 +125,20 @@ final class CardPanel extends JPanel {
     }
 
     private String abilityLetter() {
+        if (karta.abilities().contains(Ability.AGILE)) {
+            return "Z";
+        }
         if (karta.getAbills() == null) {
             return "?";
         }
         return switch (karta.getAbills()) {
-            case ZWINNOSC -> "Z";
             case MEDYK -> "M";
             case MORAL -> "MO";
             case GRUPA -> "G";
             case SZPIEG -> "S";
             case BRAT -> "B";
             case BOHATER -> "H";
+            default -> "?";
         };
     }
 

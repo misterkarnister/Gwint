@@ -68,8 +68,12 @@ public class GameSnapshotTest {
         assertEquals("Primitive druid of the swamps", snapshot.opponent().leaderDescription());
         assertTrue(snapshot.player().roundWins() >= 0);
         assertTrue(snapshot.opponent().roundWins() >= 0);
-        assertEquals(match.players()[0].getLives(), snapshot.player().lives());
-        assertEquals(match.players()[1].getLives(), snapshot.opponent().lives());
+        assertEquals(match.players()[0].getRoundWins(), snapshot.player().roundWins());
+        assertEquals(match.players()[1].getRoundWins(), snapshot.opponent().roundWins());
+        assertEquals(Math.max(0, GameRules.ROUNDS_TO_WIN - match.players()[1].getRoundWins()),
+                snapshot.player().lives());
+        assertEquals(Math.max(0, GameRules.ROUNDS_TO_WIN - match.players()[0].getRoundWins()),
+                snapshot.opponent().lives());
 
         try {
             snapshot.player().board(Karta.Row.PRZOD).add(null);

@@ -1,7 +1,11 @@
 package gwint;
 
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.GraphicsEnvironment;
+import java.awt.Rectangle;
+import java.awt.Window;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JProgressBar;
@@ -24,6 +28,25 @@ final class UiTheme {
     static final Color SPECIAL = new Color(181, 120, 196);
 
     private UiTheme() {
+    }
+
+    static void fitToScreen(Window window, Dimension preferred) {
+        if (preferred.width <= 0 || preferred.height <= 0) {
+            return;
+        }
+        Rectangle bounds = GraphicsEnvironment.getLocalGraphicsEnvironment()
+                .getMaximumWindowBounds();
+        int availableWidth = Math.max(1, bounds.width - 16);
+        int availableHeight = Math.max(1, bounds.height - 16);
+        double scale = Math.min(1.0, Math.min(availableWidth / (double) preferred.width,
+                availableHeight / (double) preferred.height));
+        int width = Math.min(availableWidth,
+                Math.max(480, (int) Math.round(preferred.width * scale)));
+        int height = Math.min(availableHeight,
+                Math.max(360, (int) Math.round(preferred.height * scale)));
+        window.setSize(width, height);
+        window.setLocation(bounds.x + (bounds.width - width) / 2,
+                bounds.y + (bounds.height - height) / 2);
     }
 
     static String faction(Karta.Faction faction) {

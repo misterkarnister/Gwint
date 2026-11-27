@@ -85,8 +85,8 @@ public class MatchTest {
         assertTrue(match.isFinished());
         assertEquals(3, match.round());
         assertTrue(match.result(), match.result().contains("draw"));
-        assertEquals(0, match.players()[0].getLives());
-        assertEquals(0, match.players()[1].getLives());
+        assertEquals(0, match.players()[0].getRoundWins());
+        assertEquals(0, match.players()[1].getRoundWins());
     }
 
     @Test
@@ -102,21 +102,38 @@ public class MatchTest {
         assertTrue(match.isFinished());
         assertTrue(match.result(), match.result().startsWith("Anna"));
         assertFalse(match.result().contains("draw"));
-        assertEquals(0, match.players()[0].getLives());
-        assertEquals(0, match.players()[1].getLives());
+        assertEquals(1, match.players()[0].getRoundWins());
+        assertEquals(0, match.players()[1].getRoundWins());
     }
 
     @Test
-    public void losingLifeDoesNotAffectOtherPlayer() {
+    public void roundWinDoesNotAffectOtherPlayer() {
         Player winner = new Player("Winner", new ScriptedController("Winner",
                 Karta.Faction.POTWORY, Mode.PASS, 9));
         Player loser = new Player("Loser", new ScriptedController("Loser",
                 Karta.Faction.SCOIATEL, Mode.PASS, 10));
 
-        loser.loseLife();
+        winner.addRoundWin();
 
-        assertEquals(GameRules.START_LIVES, winner.getLives());
-        assertEquals(GameRules.START_LIVES - 1, loser.getLives());
+        assertEquals(1, winner.getRoundWins());
+        assertEquals(0, loser.getRoundWins());
+    }
+
+    @Test
+    public void listenerReceivesLifecycleEvents() {
+        ByteArrayOutputStream log = new ByteArrayOutputStream();
+        PrintStream out = new PrintStream(log, true, StandardCharsets.UTF_8);
+        List<MatchListener.Event> events = new ArrayList<>();
+        Match match = new Match(CardCatalog.load(), LeaderCatalog.load(),
+                new ScriptedController("Anna", Karta.Faction.POTWORY, Mode.PASS, 11),
+                new ScriptedController("Boris", Karta.Faction.SCOIATEL, Mode.PASS, 12),
+                new Random(7), out, (current, event) -> events.add(event));
+
+        match.play();
+
+        assertTrue(events.contains(MatchListener.Event.ACTION));
+        assertTrue(events.contains(MatchListener.Event.ROUND_END));
+        assertTrue(events.contains(MatchListener.Event.MATCH_END));
     }
 
     @Test

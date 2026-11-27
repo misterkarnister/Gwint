@@ -157,7 +157,9 @@ final class SetupWizard {
         body.setOpaque(false);
         body.add(header("Choose your faction", "Click a card or use Left/Right arrows, then press Enter."),
                 BorderLayout.NORTH);
-        body.add(row, BorderLayout.CENTER);
+        body.add(scrollPane(row,
+                JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED,
+                JScrollPane.VERTICAL_SCROLLBAR_NEVER), BorderLayout.CENTER);
         body.add(footer(confirm, quitButton()), BorderLayout.SOUTH);
 
         JDialog dialog = dialog("Setup 1/4 - Faction", body, new Dimension(1180, 440));
@@ -478,7 +480,9 @@ final class SetupWizard {
         body.add(header("Choose your leader",
                 "Only leaders from leaders.json are shown. Abilities are display-only in this version."),
                 BorderLayout.NORTH);
-        body.add(row, BorderLayout.CENTER);
+        body.add(scrollPane(row,
+                JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED,
+                JScrollPane.VERTICAL_SCROLLBAR_NEVER), BorderLayout.CENTER);
         body.add(footer(confirm, quitButton()), BorderLayout.SOUTH);
 
         JDialog dialog = dialog("Setup 3/4 - Leader", body, new Dimension(1080, 600));
@@ -556,7 +560,9 @@ final class SetupWizard {
         JPanel body = new JPanel(new BorderLayout(12, 12));
         body.setOpaque(false);
         body.add(top, BorderLayout.NORTH);
-        body.add(grid, BorderLayout.CENTER);
+        body.add(scrollPane(grid,
+                JScrollPane.HORIZONTAL_SCROLLBAR_NEVER,
+                JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED), BorderLayout.CENTER);
         JPanel south = new JPanel(new BorderLayout(8, 6));
         south.setOpaque(false);
         south.add(footer(confirm, quitButton()), BorderLayout.SOUTH);
@@ -784,9 +790,16 @@ final class SetupWizard {
         root.setBorder(BorderFactory.createEmptyBorder(18, 18, 18, 18));
         root.add(body, BorderLayout.CENTER);
         dialog.setContentPane(root);
-        dialog.setSize(size);
-        dialog.setLocationRelativeTo(null);
+        UiTheme.fitToScreen(dialog, size);
         return dialog;
+    }
+
+    private static JScrollPane scrollPane(JComponent view, int horizontal, int vertical) {
+        JScrollPane pane = new JScrollPane(view, vertical, horizontal);
+        pane.setBorder(null);
+        pane.setOpaque(false);
+        pane.getViewport().setOpaque(false);
+        return pane;
     }
 
     private static String rowIcon(Karta.Row row) {

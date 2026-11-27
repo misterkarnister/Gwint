@@ -1,5 +1,7 @@
 package gwint;
 
+import gwint.engine.Ability;
+import gwint.engine.BattleRow;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.BlockingQueue;
@@ -39,6 +41,21 @@ final class SwingPlayerController implements PlayerController {
     @Override
     public List<CardInstance> chooseMulligan(List<CardInstance> hand) {
         return setup.chooseMulligan(hand);
+    }
+
+    @Override
+    public BattleRow chooseRow(Match match, Player self, CardInstance card,
+                               List<BattleRow> options) {
+        if (card == null || options == null || options.isEmpty()) {
+            throw new IllegalStateException("No row options for placement");
+        }
+        BattleRow fallback = options.get(0);
+        if (!card.definition().abilities().contains(Ability.AGILE)) {
+            return fallback;
+        }
+        Karta.Row selected = view.consumePlacement(card.uid());
+        BattleRow choice = BattleRow.fromKarta(selected);
+        return choice != null && options.contains(choice) ? choice : fallback;
     }
 
     @Override
