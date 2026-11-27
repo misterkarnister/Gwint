@@ -1,10 +1,13 @@
 package gwint;
 
+import gwint.engine.BattleRow;
+import gwint.engine.GameState;
+import gwint.engine.InstanceIdSource;
+import gwint.engine.SideState;
+import gwint.engine.StrengthCalculator;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.EnumMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Random;
 
@@ -13,22 +16,23 @@ public final class Player {
 
     private final String name;
     private final PlayerController controller;
-    private final List<CardInstance> deck = new ArrayList<>();
-    private final List<CardInstance> hand = new ArrayList<>();
-    private final Map<Karta.Row, List<CardInstance>> board = new EnumMap<>(Karta.Row.class);
+    private final SideState side;
 
+    private GameState gameState;
     private Leader leader;
     private boolean leaderUsed;
     private boolean passed;
     private int roundWins;
-    private int lives = GameRules.START_LIVES;
 
     public Player(String name, PlayerController controller) {
+        this(name, controller, InstanceIdSource.sequential());
+    }
+
+    public Player(String name, PlayerController controller, InstanceIdSource ids) {
         this.name = Objects.requireNonNull(name, "name");
         this.controller = Objects.requireNonNull(controller, "controller");
-        for (Karta.Row row : Karta.Row.values()) {
-            board.put(row, new ArrayList<>());
-        }
+        Objects.requireNonNull(ids, "ids");
+        this.side = new SideState(name);
     }
 
     public String getName() {
@@ -37,6 +41,15 @@ public final class Player {
 
     public PlayerController getController() {
         return controller;
+    }
+
+    public SideState side() {
+        return side;
+    }
+
+    /** Connected by the match once both sides and the shared state exist. */
+    public void attach(GameState gameState) {
+        this.gameState = gameState;
     }
 
     public Leader getLeader() {
@@ -61,64 +74,65 @@ public final class Player {
     }
 
     public List<CardInstance> getDeck() {
-        return Collections.unmodifiableList(deck);
+        return side.deck();
     }
 
     public List<CardInstance> getHand() {
-        return Collections.unmodifiableList(hand);
+        return side.hand();
     }
 
     public List<CardInstance> getBoard(Karta.Row row) {
-        return Collections.unmodifiableList(board.get(row));
+        BattleRow battleRow = BattleRow.fromKarta(row);
+        if (battleRow == null) {
+            return List.of();
+        }
+        return side.units(battleRow);
     }
 
     public List<CardInstance> boardCards() {
-        List<CardInstance> all = new ArrayList<>();
-        for (Karta.Row row : Karta.Row.values()) {
-            all.addAll(board.get(row));
-        }
-        return all;
+        return side.allUnits();
     }
 
     public void setDeck(List<CardInstance> cards) {
-        deck.clear();
-        deck.addAll(cards);
+        side.setDeck(cards);
     }
 
     /** Draws up to {@code count} cards from the top (end) of the deck into the hand. */
     public int draw(int count) {
-        int drawn = 0;
-        while (drawn < count && !deck.isEmpty()) {
-            hand.add(deck.remove(deck.size() - 1));
-            drawn++;
-        }
-        return drawn;
+        return side.draw(count);
     }
 
     /** Puts cards back into the deck and reshuffles it. */
     public void returnToDeck(List<CardInstance> cards, Random random) {
-        deck.addAll(cards);
-        Collections.shuffle(deck, random);
+        side.returnToDeck(cards, random);
     }
 
     /** Removes cards from the hand, e.g. when they are exchanged during mulligan. */
     public void removeFromHand(List<CardInstance> cards) {
-        hand.removeAll(cards);
+        side.removeFromHand(cards);
     }
 
-    /** Moves a card from the hand to its row on the board. */
+    /**
+     * Legacy placement helper kept for compatibility. Ability-aware plays go
+     * through {@code GameEngine.playFromHand} instead.
+     */
     public boolean play(CardInstance card) {
-        if (card == null || !hand.remove(card)) {
+        if (card == null || !side.removeFromHand(card)) {
             return false;
         }
-        board.get(card.card().getRow()).add(card);
+        BattleRow row = BattleRow.fromKarta(card.card().getRow());
+        if (row == null) {
+            row = card.definition().preferredRow();
+        }
+        if (row == null) {
+            return false;
+        }
+        side.placeUnit(card, row);
         return true;
     }
 
     public void clearBoard() {
-        for (Karta.Row row : Karta.Row.values()) {
-            board.get(row).clear();
-        }
+        side.clearBoard();
     }
 
     public boolean isPassed() {
@@ -137,20 +151,13 @@ public final class Player {
         roundWins++;
     }
 
-    public int getLives() {
-        return lives;
-    }
-
-    public void loseLife() {
-        if (lives > 0) {
-            lives--;
-        }
-    }
-
-    /** Sum of the power of all cards currently on the player's board. */
+    /** Effective score, including weather, bonds, morale and horns. */
     public int score() {
+        if (gameState != null) {
+            return StrengthCalculator.totalStrength(gameState, side);
+        }
         int sum = 0;
-        for (CardInstance ci : boardCards()) {
+        for (CardInstance ci : side.allUnits()) {
             sum += ci.card().getPower();
         }
         return sum;

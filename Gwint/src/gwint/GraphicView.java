@@ -1,15 +1,40 @@
 package gwint;
 
-import java.awt.Color;
-import java.awt.FlowLayout;
+import gwint.engine.Ability;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.util.HashMap;
 import java.util.List;
-import javax.swing.JFrame;
-import javax.swing.JPanel;
-import javax.swing.SwingUtilities;
+import java.util.Map;
+import javax.imageio.ImageIO;
+import javax.swing.*;
+
 
 public class GraphicView {
 
-    private static final int KART_W_RZEDZIE = 5;
+    // Rozmiar jednej karty w pikselach
+    static final int W = 160, H = 240;
+    // Ile kart w jednym rzedzie okna
+    static final int KART_W_RZEDZIE = 5;
+
+    // Szuka grafik wzgledem biezacego katalogu (dziala i z folderu Gwint, i z folderu nadrzednego)
+    private static final String[] KATALOGI = {"assets/images/cards/", "Gwint/assets/images/cards/"};
+    private static final Map<String, BufferedImage> CACHE = new HashMap<>();
+
+    private static BufferedImage grafika(String nazwa) {
+        if (CACHE.containsKey(nazwa)) return CACHE.get(nazwa);
+        BufferedImage img = null;
+        for (String dir : KATALOGI) {
+            File f = new File(dir + nazwa);
+            if (f.exists()) {
+                try { img = ImageIO.read(f); } catch (Exception e) { img = null; }
+                break;
+            }
+        }
+        CACHE.put(nazwa, img);
+        return img;
+    }
 
     /** Otwiera okno z podanymi kartami. Konsola/gra dziala dalej normalnie. */
     public static void pokaz(List<Karta> karty) {
@@ -19,15 +44,171 @@ public class GraphicView {
             JPanel panel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 10));
             panel.setBackground(new Color(25, 22, 20));
             int rzedy = (int) Math.ceil(karty.size() / (double) KART_W_RZEDZIE);
-            panel.setPreferredSize(new java.awt.Dimension(
-                    KART_W_RZEDZIE * (CardPanel.W + 10) + 10, rzedy * (CardPanel.H + 10) + 10));
-            for (Karta k : karty) {
-                panel.add(new CardPanel(k));
-            }
+            panel.setPreferredSize(new Dimension(
+                    KART_W_RZEDZIE * (W + 10) + 10, rzedy * (H + 10) + 10));
+            for (Karta k : karty) panel.add(new KartaPanel(k));
             okno.setContentPane(panel);
             okno.pack();
             okno.setLocationRelativeTo(null);
             okno.setVisible(true);
         });
+    }
+
+    // ---------------------------------------------------------------
+
+    private static class KartaPanel extends JPanel {
+        private final Karta karta;
+
+        KartaPanel(Karta karta) {
+            this.karta = karta;
+            setPreferredSize(new Dimension(W, H));
+            setOpaque(false);
+            setToolTipText(opis());
+        }
+
+        private String opis() {
+            StringBuilder sb = new StringBuilder("<html><b>").append(karta.getName())
+                    .append(karta.isHero() ? " [HERO]" : "")
+                    .append("</b><br>Power: ").append(karta.getPower())
+                    .append("<br>Row: ").append(karta.getRow())
+                    .append("<br>Abilities: ");
+            if (karta.abilities().isEmpty()) {
+                sb.append("none");
+            } else {
+                for (Ability ability : karta.abilities()) {
+                    sb.append(ability.displayName()).append(", ");
+                }
+                sb.setLength(sb.length() - 2);
+            }
+            return sb.append("</html>").toString();
+        }
+
+        @Override
+        protected void paintComponent(Graphics g0) {
+            Graphics2D g = (Graphics2D) g0.create();
+            g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+            g.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+
+            boolean hero = karta.getType() == Karta.Type.HERO;
+            boolean special = karta.getType() == Karta.Type.SPECIAL;
+
+            // tlo karty
+            g.setColor(new Color(45, 38, 32));
+            g.fillRoundRect(0, 0, W, H, 14, 14);
+
+            // ilustracja
+            rysuj(g, "art_placeholder.png", 8, 8, W - 16, H - 16);
+            // rama
+            rysuj(g, "frame_basic.png", 0, 0, W, H);
+
+            // nazwa na dole (bez paska, wiekszy font, cien dla czytelnosci)
+            Font f = new Font("SansSerif", Font.BOLD, 26);
+            String nazwa = karta.getName() == null ? "?" : karta.getName();
+            while (g.getFontMetrics(f).stringWidth(nazwa) > W - 16 && f.getSize() > 9) {
+                f = f.deriveFont((float) f.getSize() - 1);
+            }
+            g.setFont(f);
+            g.setColor(Color.BLACK);
+            srodek(g, nazwa, W / 2 + 2, H - 28);
+            g.setColor(Color.WHITE);
+            srodek(g, nazwa, W / 2, H - 30);
+
+            // kolko z moca (karty specjalne nie maja mocy)
+            if (!special) {
+                rysuj(g, hero ? "circle_hero.png" : "circle_normal.png", 6, 6, 42, 42);
+                g.setFont(new Font("SansSerif", Font.BOLD, 22));
+                // bohater: bialy numer na ciemnym kole, zwykla: czarny na jasnym
+                g.setColor(Color.BLACK);
+                srodek(g, String.valueOf(karta.getPower()), 27, 28);
+            }
+
+            // ikona rzedu (melee/range/siege/special)
+            String ikona = ikonaRzedu();
+            if (ikona != null) rysuj(g, ikona, 10, 56, 34, 34);
+
+            // umiejetnosc: pod ikona rzedu - kolko circle_special z litera (np. M)
+            if (maUmiejetnosc()) {
+                BufferedImage kolko = grafika("circle_special.png");
+                String plik = (kolko != null) ? "circle_special.png" : "icon_special.png";
+                rysuj(g, plik, 10, 96, 34, 34);
+                String skrot = skrotUmiejetnosci();
+                Font badgeFont = new Font("SansSerif", Font.BOLD, 16);
+                while (g.getFontMetrics(badgeFont).stringWidth(skrot) > 30
+                        && badgeFont.getSize() > 8) {
+                    badgeFont = badgeFont.deriveFont((float) badgeFont.getSize() - 1);
+                }
+                g.setFont(badgeFont);
+                g.setColor(Color.WHITE);
+                srodek(g, skrot, 27, 114);
+            }
+
+            // dodatkowa zlota obwodka dla bohaterow
+            if (hero) {
+                g.setColor(new Color(255, 200, 60));
+                g.setStroke(new BasicStroke(2f));
+                g.drawRoundRect(1, 1, W - 3, H - 3, 14, 14);
+            }
+            g.dispose();
+        }
+
+        private String ikonaRzedu() {
+            if (karta.getRow() == null) return null;
+            switch (karta.getRow()) {
+                case PRZOD:   return "icon_melee.png";
+                case SRODEK:  return "icon_range.png";
+                case TYL:     return "icon_siege.png";
+                case OTHER:   return "icon_special.png";
+                default:      return null;
+            }
+        }
+
+        private String skrotUmiejetnosci() {
+            StringBuilder sb = new StringBuilder();
+            for (Ability ability : karta.abilities()) {
+                if (ability == Ability.HERO) continue;
+                sb.append(switch (ability) {
+                    case AGILE -> "Z";
+                    case SPY -> "S";
+                    case MEDIC -> "M";
+                    case TIGHT_BOND -> "B";
+                    case MORALE_BOOST -> "MO";
+                    case COMMANDERS_HORN -> "CH";
+                    case MUSTER -> "G";
+                    case SCORCH_GLOBAL, SCORCH_MELEE, SCORCH_RANGED, SCORCH_SIEGE -> "SC";
+                    case DECOY -> "D";
+                    case BITING_FROST -> "F";
+                    case IMPENETRABLE_FOG -> "MG";
+                    case TORRENTIAL_RAIN -> "R";
+                    case SKELLIGE_STORM -> "ST";
+                    case CLEAR_WEATHER -> "C";
+                    case MARDROEME -> "MA";
+                    case BERSERKER -> "BE";
+                    case SUMMON_AVENGER -> "A";
+                    case HERO -> "";
+                });
+            }
+            return sb.length() == 0 ? "?" : sb.toString();
+        }
+
+        // BOHATER nie liczy sie jako umiejetnosc - bohatera widac po kole z moca
+        private boolean maUmiejetnosc() {
+            for (Ability ability : karta.abilities()) {
+                if (ability != Ability.HERO) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private void rysuj(Graphics2D g, String plik, int x, int y, int w, int h) {
+            BufferedImage img = grafika(plik);
+            if (img != null) g.drawImage(img, x, y, w, h, null);
+        }
+
+        private void srodek(Graphics2D g, String tekst, int cx, int cy) {
+            FontMetrics fm = g.getFontMetrics();
+            g.drawString(tekst, cx - fm.stringWidth(tekst) / 2, cy + (fm.getAscent() - fm.getDescent()) / 2);
+        }
     }
 }

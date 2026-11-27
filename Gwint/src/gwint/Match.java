@@ -1,10 +1,29 @@
 package gwint;
 
+import gwint.engine.Ability;
+import gwint.engine.BattleRow;
+import gwint.engine.CardChoice;
+import gwint.engine.ChoiceRequest;
+import gwint.engine.GameEngine;
+import gwint.engine.GameState;
+import gwint.engine.IllegalPlayException;
+import gwint.engine.InstanceIdSource;
+import gwint.engine.PlayComplete;
+import gwint.engine.PlayOutcome;
+import gwint.engine.PlayPending;
+import gwint.engine.RowChoice;
+import gwint.engine.RowModifiers;
+import gwint.engine.RowPurpose;
+import gwint.engine.SequentialIds;
+import gwint.engine.SideState;
+import gwint.engine.StrengthBreakdown;
+import gwint.engine.WeatherType;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Random;
+import java.util.Set;
 
 /**
  * Drives one complete match: pregame setup, mulligan, and up to three rounds.
@@ -18,7 +37,9 @@ public final class Match {
     private final Random random;
     private final PrintStream out;
     private final Player[] players;
-    private final MatchListener listener;
+    private final InstanceIdSource ids;
+    private final GameState state;
+    private final GameEngine engine;
 
     private int round = 1;
     private Player turn;
@@ -28,21 +49,19 @@ public final class Match {
     public Match(CardCatalog catalog, LeaderCatalog leaders,
                  PlayerController playerOne, PlayerController playerTwo,
                  Random random, PrintStream out) {
-        this(catalog, leaders, playerOne, playerTwo, random, out, null);
-    }
-
-    public Match(CardCatalog catalog, LeaderCatalog leaders,
-                 PlayerController playerOne, PlayerController playerTwo,
-                 Random random, PrintStream out, MatchListener listener) {
         this.catalog = Objects.requireNonNull(catalog, "catalog");
         this.leaders = Objects.requireNonNull(leaders, "leaders");
         this.random = Objects.requireNonNull(random, "random");
         this.out = Objects.requireNonNull(out, "out");
-        this.listener = listener;
+        this.ids = new SequentialIds();
         this.players = new Player[]{
-            new Player(playerOne.name(), playerOne),
-            new Player(playerTwo.name(), playerTwo)
+            new Player(playerOne.name(), playerOne, ids),
+            new Player(playerTwo.name(), playerTwo, ids)
         };
+        this.state = new GameState(players[0].side(), players[1].side(), catalog, ids);
+        this.engine = new GameEngine(state);
+        players[0].attach(state);
+        players[1].attach(state);
     }
 
     public void play() {
@@ -74,7 +93,7 @@ public final class Match {
             throw new IllegalStateException("Cannot build a legal deck for " + player.getName());
         }
         player.setLeader(controller.chooseLeader(leaders, faction));
-        player.setDeck(deck.toInstances(random));
+        player.setDeck(deck.toInstances(random, ids));
         out.println(player.getName() + ": " + faction + ", leader "
                 + player.getLeader().getName() + ", " + deck.size() + " cards");
     }
@@ -111,7 +130,6 @@ public final class Match {
             }
             Actions.Action action = turn.getController().chooseAction(this, turn);
             boolean consumesTurn = apply(action, turn);
-            notify(MatchListener.Event.ACTION);
             if (finished) {
                 return;
             }
@@ -134,9 +152,16 @@ public final class Match {
                 return true;
             }
             CardInstance card = hand.get(play.handIndex);
-            player.play(card);
+            try {
+                resolve(engine.playFromHand(player.side(), card), player);
+            } catch (IllegalPlayException | IllegalArgumentException e) {
+                out.println("Cannot play " + card.card().getName() + ": " + e.getMessage()
+                        + " - " + player.getName() + " passes instead.");
+                player.setPassed(true);
+                return true;
+            }
             out.println(player.getName() + " plays " + card.card().getName()
-                    + " (" + card.card().getPower() + ") to " + card.card().getRow());
+                    + " (" + engine.effectiveStrength(card) + ")" + describePlayEffect(card));
             return true;
         }
         if (action instanceof Actions.Pass) {
@@ -158,38 +183,106 @@ public final class Match {
         return true;
     }
 
+    /** Adds immediate feedback for effects that changed the board on this play. */
+    private String describePlayEffect(CardInstance card) {
+        StringBuilder sb = new StringBuilder();
+        Set<Ability> abilities = card.definition().abilities();
+
+        if (abilities.contains(Ability.SPY)) {
+            sb.append(" [Spy: +2 cards, placed on opponent board]");
+        }
+        if (abilities.contains(Ability.CLEAR_WEATHER)) {
+            sb.append(" [weather cleared]");
+        }
+        for (Ability ability : abilities) {
+            for (WeatherType type : WeatherType.forAbility(ability)) {
+                sb.append(" [").append(type.displayName()).append(']');
+            }
+        }
+        if (abilities.contains(Ability.SCORCH_GLOBAL)) {
+            sb.append(" [Scorch: strongest non-hero units destroyed]");
+        }
+        if (abilities.contains(Ability.SCORCH_MELEE)) {
+            sb.append(" [Scorch: strongest enemy Melee unit destroyed]");
+        }
+        if (abilities.contains(Ability.SCORCH_RANGED)) {
+            sb.append(" [Scorch: strongest enemy Ranged unit destroyed]");
+        }
+        if (abilities.contains(Ability.SCORCH_SIEGE)) {
+            sb.append(" [Scorch: strongest enemy Siege unit destroyed]");
+        }
+        if (abilities.contains(Ability.MARDROEME)) {
+            sb.append(" [Berserkers transformed]");
+        }
+        if (abilities.contains(Ability.MUSTER)) {
+            sb.append(" [Muster: matching cards summoned]");
+        }
+        if (abilities.contains(Ability.MEDIC)) {
+            sb.append(" [Medic: unit revived]");
+        }
+        if (abilities.contains(Ability.DECOY)) {
+            sb.append(" [Decoy: unit returned to hand]");
+        }
+
+        BattleRow row = card.row();
+        SideState owner = row == null ? null : engine.state().ownerOf(card);
+        if (owner != null) {
+            RowModifiers modifiers = engine.rowModifiers(owner, row);
+            if (modifiers.hasEffects()) {
+                sb.append(" | ").append(row).append(": ").append(modifiers.describe());
+            }
+        }
+        return sb.toString();
+    }
+
+    /** Drives every outstanding target prompt to completion. */
+    private void resolve(PlayOutcome outcome, Player player) {
+        while (outcome instanceof PlayPending pending) {
+            Object answer = askChoice(pending.request(), player);
+            outcome = pending.session().answer(answer);
+        }
+        if (!(outcome instanceof PlayComplete)) {
+            throw new IllegalStateException("Play resolution did not complete");
+        }
+    }
+
+    private Object askChoice(ChoiceRequest request, Player player) {
+        PlayerController controller = player.getController();
+        if (request instanceof RowChoice row) {
+            return row.purpose() == RowPurpose.SPECIAL
+                    ? controller.chooseSpecialRow(this, player, row.card(), row.options())
+                    : controller.chooseRow(this, player, row.card(), row.options());
+        }
+        if (request instanceof CardChoice card) {
+            return card.purpose() == gwint.engine.CardPurpose.REVIVE
+                    ? controller.chooseRevival(this, player, card.options())
+                    : controller.chooseDecoyTarget(this, player, card.options());
+        }
+        throw new IllegalStateException("Unknown choice request: " + request);
+    }
+
     private boolean bothPassed() {
         return players[0].isPassed() && players[1].isPassed();
     }
 
     private void endRound() {
-        int scoreOne = players[0].score();
-        int scoreTwo = players[1].score();
-        out.println("\nRound " + round + " scores: " + players[0].getName() + " " + scoreOne
-                + " - " + scoreTwo + " " + players[1].getName());
+        out.println("\nRound " + round + " final board (before scoring):");
+        renderRoundBreakdown();
+        GameEngine.RoundResult scores = engine.finishRound();
+        out.println("\nRound " + round + " scores: " + players[0].getName() + " "
+                + scores.firstScore() + " - " + scores.secondScore() + " " + players[1].getName());
 
-        Player winner = null;
-        if (scoreOne > scoreTwo) {
-            winner = players[0];
-        } else if (scoreTwo > scoreOne) {
-            winner = players[1];
-        }
+        Player winner = scores.winnerIndex() == null ? null : players[scores.winnerIndex()];
         if (winner != null) {
             winner.addRoundWin();
-            other(winner).loseLife();
             out.println(winner.getName() + " wins the round.");
         } else {
-            for (Player p : players) {
-                p.loseLife();
-            }
             out.println("The round is a draw.");
         }
 
         for (Player p : players) {
-            p.clearBoard();
             p.setPassed(false);
         }
-        notify(MatchListener.Event.ROUND_END);
 
         if (players[0].getRoundWins() >= GameRules.ROUNDS_TO_WIN
                 || players[1].getRoundWins() >= GameRules.ROUNDS_TO_WIN) {
@@ -209,7 +302,24 @@ public final class Match {
         }
 
         round++;
+        engine.beginNextRound();
         turn = winner != null ? winner : other(turn);
+    }
+
+    /** Prints the exact per-row contribution to a round's final score. */
+    private void renderRoundBreakdown() {
+        for (Player p : players) {
+            List<String> rows = new ArrayList<>();
+            for (BattleRow row : BattleRow.values()) {
+                RowModifiers modifiers = engine.rowModifiers(p.side(), row);
+                if (modifiers.effectiveStrength() == 0 && !modifiers.hasEffects()) {
+                    continue;
+                }
+                rows.add(row + " " + modifiers.describeWithStrength());
+            }
+            out.println("  " + p.getName() + ": "
+                    + (rows.isEmpty() ? "0" : String.join(" | ", rows)));
+        }
     }
 
     private Player winnerOfMatch() {
@@ -220,37 +330,65 @@ public final class Match {
         finished = true;
         result = message;
         out.println("=== " + message + " ===");
-        notify(MatchListener.Event.MATCH_END);
-    }
-
-    private void notify(MatchListener.Event event) {
-        if (listener != null) {
-            listener.onStateChanged(this, event);
-        }
     }
 
     private void render() {
-        out.println("Scores: " + players[0].getName() + " " + players[0].score()
-                + " | " + players[1].getName() + " " + players[1].score()
+        out.println("Scores: " + players[0].getName() + " " + engine.totalStrength(players[0].side())
+                + " | " + players[1].getName() + " " + engine.totalStrength(players[1].side())
                 + "   (round wins " + players[0].getRoundWins() + "-"
                 + players[1].getRoundWins() + ")");
+        renderWeather();
         for (Player p : players) {
-            out.println(p.getName() + " board:");
-            for (Karta.Row row : Karta.Row.values()) {
-                List<CardInstance> cards = p.getBoard(row);
-                if (cards.isEmpty()) {
-                    continue;
-                }
-                StringBuilder sb = new StringBuilder("  " + row + ": ");
-                for (CardInstance ci : cards) {
-                    sb.append(ci.card().getName()).append("(")
-                            .append(ci.card().getPower()).append(") ");
-                }
-                out.println(sb.toString().stripTrailing());
+            out.println(p.getName() + " board (" + engine.totalStrength(p.side()) + "):");
+            for (BattleRow row : BattleRow.values()) {
+                renderRow(p, row);
             }
         }
         out.println("Turn: " + turn.getName()
                 + (turn.isLeaderUsed() ? " (leader used)" : " (leader available)"));
+    }
+
+    private void renderWeather() {
+        Set<WeatherType> active = engine.state().weather();
+        if (active.isEmpty()) {
+            out.println("Weather: clear");
+            return;
+        }
+        List<String> names = new ArrayList<>();
+        for (WeatherType type : WeatherType.values()) {
+            if (active.contains(type)) {
+                names.add(type.displayName());
+            }
+        }
+        out.println("Weather: " + String.join(", ", names));
+    }
+
+    private void renderRow(Player player, BattleRow row) {
+        SideState side = player.side();
+        RowModifiers modifiers = engine.rowModifiers(side, row);
+        List<CardInstance> cards = side.units(row);
+        CardInstance special = side.special(row);
+        if (cards.isEmpty() && special == null && !modifiers.hasEffects()) {
+            return;
+        }
+
+        StringBuilder sb = new StringBuilder("  ").append(row).append(": ")
+                .append(modifiers.describeWithStrength());
+        if (special != null) {
+            sb.append(" | row card: ").append(special.definition().name());
+        }
+        if (!cards.isEmpty()) {
+            sb.append(" | ");
+            for (CardInstance ci : cards) {
+                StrengthBreakdown breakdown = engine.breakdown(ci);
+                sb.append(ci.card().getName()).append('(').append(breakdown.finalStrength());
+                if (breakdown.isModified()) {
+                    sb.append('[').append(String.join("+", breakdown.tags())).append(']');
+                }
+                sb.append(") ");
+            }
+        }
+        out.println(sb.toString().stripTrailing());
     }
 
     private Player other(Player player) {
@@ -266,7 +404,7 @@ public final class Match {
     }
 
     public int scoreOf(Player player) {
-        return player.score();
+        return engine.totalStrength(player.side());
     }
 
     public int round() {
@@ -303,5 +441,18 @@ public final class Match {
 
     public Random random() {
         return random;
+    }
+
+    /** Exposed for engine-level integration tests. */
+    public GameState gameState() {
+        return state;
+    }
+
+    public GameEngine engine() {
+        return engine;
+    }
+
+    public SideState sideOf(Player player) {
+        return player.side();
     }
 }

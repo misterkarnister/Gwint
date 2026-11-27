@@ -1,5 +1,6 @@
 package gwint;
 
+import gwint.engine.BattleRow;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -73,5 +74,27 @@ public final class RandomAiController implements PlayerController {
             return new Actions.Pass();
         }
         return new Actions.Play(random.nextInt(self.getHand().size()));
+    }
+
+    @Override
+    public BattleRow chooseRow(Match match, Player self, CardInstance card,
+                               List<BattleRow> options) {
+        return options.get(random.nextInt(options.size()));
+    }
+
+    @Override
+    public BattleRow chooseSpecialRow(Match match, Player self, CardInstance card,
+                                      List<BattleRow> options) {
+        return options.get(random.nextInt(options.size()));
+    }
+
+    @Override
+    public CardInstance chooseRevival(Match match, Player self, List<CardInstance> options) {
+        return options.get(random.nextInt(options.size()));
+    }
+
+    @Override
+    public CardInstance chooseDecoyTarget(Match match, Player self, List<CardInstance> options) {
+        return options.get(random.nextInt(options.size()));
     }
 }
